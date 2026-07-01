@@ -1,3 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
 .env
-.venv
-__pycache__
+*.db
+
+# Chroma
+chroma_db/
+
+# Node
+node_modules/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Secrets
+backend/.env
+frontend/.env.local
