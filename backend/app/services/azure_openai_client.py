@@ -65,50 +65,82 @@ class AzureOpenAIService:
         """
         Sends a simple chat completion request to Azure OpenAI.
 
-        Args:
-            user_message:
-                The employee's message.
-            system_message:
-                Optional system instruction.
-
-        Returns:
-            The assistant response text.
+        GPT-5 / reasoning-style deployments use:
+        - developer message instead of system message
+        - max_completion_tokens instead of max_tokens
+        - no temperature/top_p
         """
 
-        messages: list[dict[str, str]] = []
+        deployment_name = self.settings.azure_openai_chat_deployment.lower()
 
-        messages.append(
-            {
-                "role": "system",
-                "content": system_message
-                or (
-                    "You are an enterprise IT support assistant. "
-                    "Give clear, practical, safe IT troubleshooting guidance. "
-                    "Do not claim to perform admin actions, password resets, "
-                    "permission changes, or ticket creation unless a tool has done it."
-                ),
-            }
+        is_reasoning_model = (
+            deployment_name.startswith("gpt-5")
+            or deployment_name.startswith("o1")
+            or deployment_name.startswith("o3")
+            or deployment_name.startswith("o4")
         )
 
-        messages.append(
-            {
-                "role": "user",
-                "content": user_message,
-            }
+        instruction = system_message or (
+            "You are an enterprise IT support assistant. "
+            "Give a short, practical answer. "
+            "Do not perform admin actions. "
+            "Do not create tickets unless a tool has done it. "
+            "For this response, provide only 3 concise troubleshooting steps."
         )
+
+        if is_reasoning_model:
+            messages: list[dict[str, str]] = [
+                {
+                    "role": "developer",
+                    "content": instruction,
+                },
+                {
+                    "role": "user",
+                    "content": user_message,
+                },
+            ]
+        else:
+            messages = [
+                {
+                    "role": "system",
+                    "content": instruction,
+                },
+                {
+                    "role": "user",
+                    "content": user_message,
+                },
+            ]
+
+        request_payload: dict[str, Any] = {
+            "model": self.settings.azure_openai_chat_deployment,
+            "messages": messages,
+        }
+
+        if is_reasoning_model:
+            request_payload["max_completion_tokens"] = self.settings.llm_max_tokens
+            request_payload["reasoning_effort"] = "minimal"
+        else:
+            request_payload["temperature"] = self.settings.llm_temperature
+            request_payload["max_tokens"] = self.settings.llm_max_tokens
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.settings.azure_openai_chat_deployment,
-                messages=messages,
-                temperature=self.settings.llm_temperature,
-                max_tokens=self.settings.llm_max_tokens,
-            )
+            response = self.client.chat.completions.create(**request_payload)
 
-            content = response.choices[0].message.content
+            choice = response.choices[0]
+            content = choice.message.content
+            finish_reason = choice.finish_reason
+
+            logger.info("Azure OpenAI finish_reason: %s", finish_reason)
+            logger.info("Azure OpenAI usage: %s", response.usage)
 
             if not content:
-                return "I could not generate a response. Please try again."
+                return (
+                    "Azure OpenAI returned an empty visible response. "
+                    f"finish_reason={finish_reason}. "
+                    f"usage={response.usage}. "
+                    "Try increasing LLM_MAX_TOKENS or use a standard chat deployment "
+                    "such as gpt-4o-mini for this project."
+                )
 
             return content
 
