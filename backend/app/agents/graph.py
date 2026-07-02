@@ -12,38 +12,33 @@ def build_helpdesk_graph():
     """
     Builds the Phase 3 LangGraph workflow.
 
-    Current flow:
-    START
-      → Triage Agent
-      → Supervisor Agent
-      → either Clarification Agent or Resolution Agent
-      → Summary Agent
-      → END
+    Node names intentionally use *_agent suffixes so they do not conflict
+    with AgentState keys like 'triage' or 'resolution'.
     """
 
     graph = StateGraph(AgentState)
 
-    graph.add_node("triage", triage_agent)
-    graph.add_node("supervisor", supervisor_agent)
-    graph.add_node("clarification", clarification_agent)
-    graph.add_node("resolution", resolution_agent)
-    graph.add_node("summary", summary_agent)
+    graph.add_node("triage_agent", triage_agent)
+    graph.add_node("supervisor_agent", supervisor_agent)
+    graph.add_node("clarification_agent", clarification_agent)
+    graph.add_node("resolution_agent", resolution_agent)
+    graph.add_node("summary_agent", summary_agent)
 
-    graph.add_edge(START, "triage")
-    graph.add_edge("triage", "supervisor")
+    graph.add_edge(START, "triage_agent")
+    graph.add_edge("triage_agent", "supervisor_agent")
 
     graph.add_conditional_edges(
-        "supervisor",
+        "supervisor_agent",
         route_after_supervisor,
         {
-            "clarification": "clarification",
-            "resolution": "resolution",
+            "clarification": "clarification_agent",
+            "resolution": "resolution_agent",
         },
     )
 
-    graph.add_edge("clarification", "summary")
-    graph.add_edge("resolution", "summary")
-    graph.add_edge("summary", END)
+    graph.add_edge("clarification_agent", "summary_agent")
+    graph.add_edge("resolution_agent", "summary_agent")
+    graph.add_edge("summary_agent", END)
 
     return graph.compile()
 

@@ -1,11 +1,20 @@
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.agents.graph import run_helpdesk_graph
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.models.database_models import Conversation, Message, MessageRole, User, UserRole
+from app.models.database_models import (
+    AgentLog,
+    Conversation,
+    Message,
+    MessageRole,
+    User,
+    UserRole,
+)
 from app.schemas.chat import (
     AzureOpenAIHealthResponse,
     ChatRequest,
@@ -177,21 +186,88 @@ def simple_chat(
     )
 
 
-@router.post("", response_model=ChatResponse)
-def chat(request: ChatRequest) -> ChatResponse:
-    """
-    Placeholder for the final LangGraph-powered chat endpoint.
+def save_agent_logs(
+    db: Session,
+    conversation_id: str,
+    agent_trace: list,
+) -> None:
+    for step in agent_trace:
+        log = AgentLog(
+            conversation_id=conversation_id,
+            agent_name=step.agent_name,
+            input_summary=step.input_summary,
+            output_summary=step.output_summary,
+            metadata_json=json.dumps(step.metadata),
+        )
 
-    This will be replaced in Phase 3.
+        db.add(log)
+
+    db.commit()
+
+
+@router.post("", response_model=ChatResponse)
+def chat(
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+) -> ChatResponse:
     """
+    Phase 3 LangGraph-powered chat endpoint.
+
+    Current agents:
+    - Triage Agent
+    - Supervisor Agent
+    - Clarification Agent
+    - Resolution Agent
+    - Summary Agent
+    """
+
+    user = get_or_create_demo_user(db=db, email=request.user_email)
+
+    conversation = get_or_create_conversation(
+        db=db,
+        user=user,
+        conversation_id=request.conversation_id,
+        first_message=request.message,
+    )
+
+    save_message(
+        db=db,
+        conversation_id=conversation.id,
+        role=MessageRole.user,
+        content=request.message,
+    )
+
+    graph_result = run_helpdesk_graph(
+        user_message=request.message,
+        user_email=request.user_email,
+        conversation_id=conversation.id,
+    )
+
+    final_response = (
+        graph_result.get("final_summary")
+        or graph_result.get("resolution")
+        or graph_result.get("clarification_question")
+        or "I could not process the request."
+    )
+
+    save_message(
+        db=db,
+        conversation_id=conversation.id,
+        role=MessageRole.assistant,
+        content=final_response,
+    )
+
+    save_agent_logs(
+        db=db,
+        conversation_id=conversation.id,
+        agent_trace=graph_result.get("agent_trace", []),
+    )
 
     return ChatResponse(
-        conversation_id=request.conversation_id or "phase-2-placeholder",
-        response=(
-            "Phase 2 is active. Use POST /api/chat/simple to test Azure OpenAI. "
-            "The full LangGraph multi-agent workflow will be added in Phase 3."
-        ),
+        conversation_id=conversation.id,
+        response=final_response,
         ticket_number=None,
-        requires_approval=False,
+        requires_approval=graph_result.get("requires_approval", False),
+        approval_id=None,
         sources=[],
     )
