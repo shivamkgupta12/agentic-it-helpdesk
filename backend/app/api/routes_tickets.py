@@ -34,19 +34,6 @@ def list_tickets(
     return query.order_by(Ticket.created_at.desc()).all()
 
 
-@router.get("/{ticket_id}", response_model=TicketDetailResponse)
-def get_ticket(
-    ticket_id: str,
-    db: Session = Depends(get_db),
-) -> Ticket:
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
-
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found.")
-
-    return ticket
-
-
 @router.post("", response_model=TicketResponse)
 def create_ticket(
     request: TicketCreate,
@@ -57,7 +44,7 @@ def create_ticket(
     service = TicketService(db)
 
     try:
-        ticket = service.create_ticket(
+        return service.create_ticket(
             TicketCreateInput(
                 user_id=user.id,
                 conversation_id=request.conversation_id,
@@ -69,10 +56,35 @@ def create_ticket(
             )
         )
 
-        return ticket
-
     except TicketServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/status/{ticket_number}", response_model=TicketStatusResponse)
+def get_ticket_status(
+    ticket_number: str,
+    db: Session = Depends(get_db),
+) -> dict:
+    service = TicketService(db)
+
+    try:
+        return service.get_ticket_status(ticket_number)
+
+    except TicketServiceError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{ticket_id}", response_model=TicketDetailResponse)
+def get_ticket(
+    ticket_id: str,
+    db: Session = Depends(get_db),
+) -> Ticket:
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found.")
+
+    return ticket
 
 
 @router.patch("/{ticket_id}", response_model=TicketResponse)
@@ -101,17 +113,3 @@ def update_ticket(
 
     except TicketServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.get("/status/{ticket_number}", response_model=TicketStatusResponse)
-def get_ticket_status(
-    ticket_number: str,
-    db: Session = Depends(get_db),
-) -> dict:
-    service = TicketService(db)
-
-    try:
-        return service.get_ticket_status(ticket_number)
-
-    except TicketServiceError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
