@@ -18,6 +18,7 @@ Include:
 - Recommended Steps
 - Ticket Recommendation
 - Approval Requirement if sensitive
+- Sources Used if sources are available
 
 Do not claim a ServiceNow ticket was created unless a ticket number is provided.
 Keep it clear and professional.
@@ -27,6 +28,7 @@ Keep it clear and professional.
 def build_fallback_summary(state: AgentState) -> str:
     triage = state.get("triage")
     resolution = state.get("resolution") or state.get("clarification_question") or ""
+    sources = state.get("sources", [])
 
     if not triage:
         return resolution
@@ -39,6 +41,18 @@ def build_fallback_summary(state: AgentState) -> str:
             "or identity verification before it can proceed."
         )
 
+    sources_note = ""
+    if sources:
+        source_titles = []
+        for source in sources:
+            title = source.get("title", "Unknown source")
+            if title not in source_titles:
+                source_titles.append(title)
+
+        sources_note = "\n\nSources Used:\n" + "\n".join(
+            f"- {title}" for title in source_titles
+        )
+
     return (
         f"Issue Summary:\n{state['user_message']}\n\n"
         f"Category:\n{triage.category}\n\n"
@@ -46,6 +60,7 @@ def build_fallback_summary(state: AgentState) -> str:
         f"Ticket Recommendation:\n"
         f"{'A support ticket is recommended if the issue remains unresolved.' if triage.ticket_required else 'A ticket is not required yet.'}"
         f"{approval_note}"
+        f"{sources_note}"
     )
 
 
@@ -53,11 +68,14 @@ def summary_agent(state: AgentState) -> dict:
     triage = state.get("triage")
     resolution = state.get("resolution") or state.get("clarification_question") or ""
 
+    sources = state.get("sources", [])
+
     prompt = (
         f"User issue: {state['user_message']}\n\n"
         f"Triage result: {triage.model_dump() if triage else {}}\n\n"
         f"Resolution or clarification:\n{resolution}\n\n"
-        "Create the final response."
+        f"Sources:\n{sources}\n\n"
+        "Create the final response. If sources are available, include a short 'Sources Used' section."
     )
 
     try:
