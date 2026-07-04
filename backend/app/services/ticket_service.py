@@ -10,6 +10,12 @@ from app.models.database_models import (
     TicketStatus,
     User,
 )
+from app.services.servicenow_client import (
+    ServiceNowAPIError,
+    ServiceNowClient,
+    ServiceNowConfigError,
+    ServiceNowIncidentCreateInput,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +39,9 @@ class TicketService:
     """
     Ticket service used by the Ticket Agent and ticket API routes.
 
-    Phase 5:
-    - Supports mock ticket creation.
-    - Stores tickets in the local database.
-
-    Phase 6:
-    - Will call real ServiceNow when SERVICENOW_MODE=real.
+    Supports:
+    - Mock local tickets
+    - Real ServiceNow incidents
     """
 
     def __init__(self, db: Session) -> None:
@@ -46,13 +49,6 @@ class TicketService:
         self.settings = get_settings()
 
     def generate_mock_ticket_number(self) -> str:
-        """
-        Generates a readable mock ticket number.
-
-        Example:
-        MOCK001001
-        """
-
         existing_count = self.db.query(Ticket).count()
         next_number = 1001 + existing_count
 
@@ -71,19 +67,12 @@ class TicketService:
             next_number += 1
 
     def create_ticket(self, data: TicketCreateInput) -> Ticket:
-        """
-        Creates a ticket.
-
-        For Phase 5, only mock mode is implemented.
-        Real ServiceNow mode will be added in Phase 6.
-        """
-
         if self.settings.servicenow_mode == "real":
-            raise TicketServiceError(
-                "SERVICENOW_MODE=real is not implemented yet. "
-                "Use SERVICENOW_MODE=mock until Phase 6."
-            )
+            return self._create_real_servicenow_ticket(data)
 
+        return self._create_mock_ticket(data)
+
+    def _create_mock_ticket(self, data: TicketCreateInput) -> Ticket:
         ticket_number = self.generate_mock_ticket_number()
 
         ticket = Ticket(
@@ -118,6 +107,67 @@ class TicketService:
 
         return ticket
 
+    def _create_real_servicenow_ticket(self, data: TicketCreateInput) -> Ticket:
+        try:
+            client = ServiceNowClient()
+
+            sn_category = client.map_category_to_servicenow(data.category)
+            impact, urgency = client.map_priority_to_impact_urgency(
+                priority=data.priority,
+                urgency=data.urgency,
+            )
+
+            incident = client.create_incident(
+                ServiceNowIncidentCreateInput(
+                    short_description=data.title,
+                    description=data.description,
+                    category=sn_category,
+                    impact=impact,
+                    urgency=urgency,
+                    comments="Created by Agentic IT Helpdesk AI Ticket Agent.",
+                    work_notes=(
+                        "AI triage completed. "
+                        f"Category={data.category}; Priority={data.priority}; Urgency={data.urgency}."
+                    ),
+                )
+            )
+
+            ticket = Ticket(
+                user_id=data.user_id,
+                conversation_id=data.conversation_id,
+                ticket_number=incident.number,
+                servicenow_sys_id=incident.sys_id,
+                title=data.title,
+                description=data.description,
+                category=data.category,
+                priority=data.priority,
+                urgency=data.urgency,
+                status=TicketStatus.open,
+                source="servicenow",
+            )
+
+            self.db.add(ticket)
+            self.db.commit()
+            self.db.refresh(ticket)
+
+            event = TicketEvent(
+                ticket_id=ticket.id,
+                event_type="created",
+                description=f"ServiceNow incident {incident.number} created by AI Ticket Agent.",
+                metadata_json=None,
+            )
+
+            self.db.add(event)
+            self.db.commit()
+
+            logger.info("Created ServiceNow incident %s", incident.number)
+
+            return ticket
+
+        except (ServiceNowConfigError, ServiceNowAPIError) as exc:
+            logger.exception("ServiceNow ticket creation failed")
+            raise TicketServiceError(f"ServiceNow ticket creation failed: {exc}") from exc
+
     def get_ticket_by_number(self, ticket_number: str) -> Ticket | None:
         return (
             self.db.query(Ticket)
@@ -130,6 +180,28 @@ class TicketService:
 
         if not ticket:
             raise TicketServiceError(f"Ticket not found: {ticket_number}")
+
+        if self.settings.servicenow_mode == "real" and ticket.servicenow_sys_id:
+            try:
+                client = ServiceNowClient()
+                incident = client.get_incident_by_sys_id(ticket.servicenow_sys_id)
+
+                latest_update = (
+                    f"ServiceNow incident {incident.number} currently has "
+                    f"state={incident.state}, priority={incident.priority}."
+                )
+
+                return {
+                    "ticket_number": incident.number,
+                    "status": incident.state or ticket.status.value,
+                    "category": ticket.category,
+                    "priority": ticket.priority,
+                    "urgency": ticket.urgency,
+                    "latest_update": latest_update,
+                }
+
+            except (ServiceNowConfigError, ServiceNowAPIError) as exc:
+                logger.warning("Could not fetch real ServiceNow status: %s", exc)
 
         latest_event = (
             self.db.query(TicketEvent)
@@ -191,6 +263,51 @@ class TicketService:
 
         self.db.add(event)
         self.db.commit()
+
+        return ticket
+
+    def add_ticket_comment(
+        self,
+        ticket_number: str,
+        comment: str,
+        internal: bool = False,
+    ) -> Ticket:
+        ticket = self.get_ticket_by_number(ticket_number)
+
+        if not ticket:
+            raise TicketServiceError(f"Ticket not found: {ticket_number}")
+
+        if self.settings.servicenow_mode == "real" and ticket.servicenow_sys_id:
+            try:
+                client = ServiceNowClient()
+
+                if internal:
+                    client.update_incident(
+                        sys_id=ticket.servicenow_sys_id,
+                        work_notes=comment,
+                    )
+                else:
+                    client.update_incident(
+                        sys_id=ticket.servicenow_sys_id,
+                        comments=comment,
+                    )
+
+            except (ServiceNowConfigError, ServiceNowAPIError) as exc:
+                logger.exception("ServiceNow ticket comment update failed")
+                raise TicketServiceError(
+                    f"ServiceNow ticket comment update failed: {exc}"
+                ) from exc
+
+        event = TicketEvent(
+            ticket_id=ticket.id,
+            event_type="comment_added",
+            description=comment,
+            metadata_json=None,
+        )
+
+        self.db.add(event)
+        self.db.commit()
+        self.db.refresh(ticket)
 
         return ticket
 
