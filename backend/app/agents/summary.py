@@ -16,11 +16,13 @@ Include:
 - Issue Summary
 - Category
 - Recommended Steps
-- Ticket Recommendation
+- Ticket Status if a ticket was created
+- Ticket Recommendation if no ticket was created
 - Approval Requirement if sensitive
 - Sources Used if sources are available
 
 Do not claim a ServiceNow ticket was created unless a ticket number is provided.
+If the ticket number starts with MOCK, clearly call it a mock/local demo ticket.
 Keep it clear and professional.
 """
 
@@ -29,6 +31,8 @@ def build_fallback_summary(state: AgentState) -> str:
     triage = state.get("triage")
     resolution = state.get("resolution") or state.get("clarification_question") or ""
     sources = state.get("sources", [])
+    ticket_number = state.get("ticket_number")
+    ticket_status = state.get("ticket_status")
 
     if not triage:
         return resolution
@@ -40,6 +44,27 @@ def build_fallback_summary(state: AgentState) -> str:
             "This request involves a sensitive IT action and requires admin approval "
             "or identity verification before it can proceed."
         )
+
+    if ticket_number:
+        ticket_note = (
+            f"\n\nTicket Status:\n"
+            f"A local mock ticket has been created: {ticket_number}.\n"
+            f"Current status: {ticket_status or 'Open'}."
+        )
+    else:
+        if triage.sensitive_action:
+            ticket_note = (
+                "\n\nTicket Recommendation:\n"
+                "A ticket or approval request can be created after the required admin "
+                "approval or identity verification step."
+            )
+        elif triage.ticket_required:
+            ticket_note = (
+                "\n\nTicket Recommendation:\n"
+                "If the issue remains unresolved after these steps, a support ticket should be created."
+            )
+        else:
+            ticket_note = "\n\nTicket Recommendation:\nA ticket is not required yet."
 
     sources_note = ""
     if sources:
@@ -56,9 +81,8 @@ def build_fallback_summary(state: AgentState) -> str:
     return (
         f"Issue Summary:\n{state['user_message']}\n\n"
         f"Category:\n{triage.category}\n\n"
-        f"Recommended Steps:\n{resolution}\n\n"
-        f"Ticket Recommendation:\n"
-        f"{'A support ticket is recommended if the issue remains unresolved.' if triage.ticket_required else 'A ticket is not required yet.'}"
+        f"Recommended Steps:\n{resolution}"
+        f"{ticket_note}"
         f"{approval_note}"
         f"{sources_note}"
     )
@@ -69,13 +93,19 @@ def summary_agent(state: AgentState) -> dict:
     resolution = state.get("resolution") or state.get("clarification_question") or ""
 
     sources = state.get("sources", [])
+    ticket_number = state.get("ticket_number")
+    ticket_status = state.get("ticket_status")
 
     prompt = (
         f"User issue: {state['user_message']}\n\n"
         f"Triage result: {triage.model_dump() if triage else {}}\n\n"
         f"Resolution or clarification:\n{resolution}\n\n"
+        f"Ticket number: {ticket_number}\n"
+        f"Ticket status: {ticket_status}\n\n"
         f"Sources:\n{sources}\n\n"
-        "Create the final response. If sources are available, include a short 'Sources Used' section."
+        "Create the final response. "
+        "If a ticket number exists, include it clearly. "
+        "If sources are available, include a short 'Sources Used' section."
     )
 
     try:

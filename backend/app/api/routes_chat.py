@@ -241,8 +241,10 @@ def chat(
         user_message=request.message,
         user_email=request.user_email,
         conversation_id=conversation.id,
+        user_id=user.id,
+        db_session=db,
     )
-
+    
     final_response = (
         graph_result.get("final_summary")
         or graph_result.get("resolution")
@@ -266,7 +268,7 @@ def chat(
     return ChatResponse(
         conversation_id=conversation.id,
         response=final_response,
-        ticket_number=None,
+        ticket_number=graph_result.get("ticket_number"),
         requires_approval=graph_result.get("requires_approval", False),
         approval_id=None,
         sources=graph_result.get("sources", []),
