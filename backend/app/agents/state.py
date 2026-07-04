@@ -12,7 +12,9 @@ class AgentState(TypedDict, total=False):
 
     user_message: str
     user_email: str
+    user_id: str | None
     conversation_id: str | None
+    db_session: Any
 
     triage: TriageResult | None
     next_agent: str | None
@@ -28,5 +30,10 @@ class AgentState(TypedDict, total=False):
     ticket_required: bool
     sensitive_action: bool
     requires_approval: bool
+    should_create_ticket: bool
+
+    ticket_id: str | None
+    ticket_number: str | None
+    ticket_status: str | None
 
     agent_trace: list[AgentTraceStep]
