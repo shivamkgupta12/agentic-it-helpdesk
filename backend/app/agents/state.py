@@ -18,6 +18,10 @@ class AgentState(TypedDict, total=False):
     next_agent: str | None
 
     clarification_question: str | None
+
+    retrieved_context: str | None
+    sources: list[dict[str, Any]]
+
     resolution: str | None
     final_summary: str | None
 
@@ -25,5 +29,4 @@ class AgentState(TypedDict, total=False):
     sensitive_action: bool
     requires_approval: bool
 
-    sources: list[dict[str, Any]]
     agent_trace: list[AgentTraceStep]
