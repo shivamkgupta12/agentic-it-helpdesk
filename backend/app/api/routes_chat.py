@@ -269,5 +269,5 @@ def chat(
         ticket_number=None,
         requires_approval=graph_result.get("requires_approval", False),
         approval_id=None,
-        sources=[],
+        sources=graph_result.get("sources", []),
     )
