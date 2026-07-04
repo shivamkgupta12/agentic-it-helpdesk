@@ -13,7 +13,10 @@ You are the Resolution Agent for an enterprise IT helpdesk.
 Generate safe, practical troubleshooting guidance for the user's issue.
 
 Rules:
+- Use the retrieved internal knowledge base context when available.
 - Give clear numbered steps.
+- Mention source titles naturally when useful.
+- Do not invent policy details that are not in the context.
 - Do not claim that a ticket was created.
 - Do not claim that you reset a password, changed access, installed software, or performed admin actions.
 - If the issue is sensitive, explain that admin approval or identity verification is required.
@@ -68,13 +71,18 @@ def resolution_agent(state: AgentState) -> dict:
     category = triage.category if triage else "General IT Query"
     sensitive_action = triage.sensitive_action if triage else False
 
+    retrieved_context = state.get("retrieved_context") or "No retrieved knowledge base context available."
+
     prompt = (
         f"User issue: {user_message}\n\n"
         f"Triage category: {category}\n"
         f"Priority: {triage.priority if triage else 'Medium'}\n"
         f"Urgency: {triage.urgency if triage else 'Medium'}\n"
         f"Sensitive action: {sensitive_action}\n"
-        f"Ticket likely required: {triage.ticket_required if triage else False}\n"
+        f"Ticket likely required: {triage.ticket_required if triage else False}\n\n"
+        f"Retrieved internal knowledge base context:\n"
+        f"{retrieved_context}\n\n"
+        "Generate the response using the internal context where relevant."
     )
 
     try:
@@ -102,9 +110,11 @@ def resolution_agent(state: AgentState) -> dict:
         input_summary=f"Category={category}; sensitive_action={sensitive_action}",
         output_summary=resolution[:500],
         metadata={
-            "category": category,
-            "sensitive_action": sensitive_action,
-        },
+        "category": category,
+        "sensitive_action": sensitive_action,
+        "used_rag_context": bool(state.get("retrieved_context")),
+        "source_count": len(state.get("sources", [])),
+    },
     )
 
     return {
