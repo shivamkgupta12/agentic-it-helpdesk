@@ -1,6 +1,7 @@
 from langgraph.graph import END, START, StateGraph
 
 from app.agents.clarification import clarification_agent
+from app.agents.knowledge import knowledge_retrieval_agent
 from app.agents.resolution import resolution_agent
 from app.agents.state import AgentState
 from app.agents.summary import summary_agent
@@ -10,10 +11,16 @@ from app.agents.triage import triage_agent
 
 def build_helpdesk_graph():
     """
-    Builds the Phase 3 LangGraph workflow.
+    Builds the Phase 4 LangGraph workflow.
 
-    Node names intentionally use *_agent suffixes so they do not conflict
-    with AgentState keys like 'triage' or 'resolution'.
+    Flow:
+    START
+      → Triage Agent
+      → Supervisor Agent
+      → either Clarification Agent or Knowledge Retrieval Agent
+      → Resolution Agent
+      → Summary Agent
+      → END
     """
 
     graph = StateGraph(AgentState)
@@ -21,6 +28,7 @@ def build_helpdesk_graph():
     graph.add_node("triage_agent", triage_agent)
     graph.add_node("supervisor_agent", supervisor_agent)
     graph.add_node("clarification_agent", clarification_agent)
+    graph.add_node("knowledge_agent", knowledge_retrieval_agent)
     graph.add_node("resolution_agent", resolution_agent)
     graph.add_node("summary_agent", summary_agent)
 
@@ -32,11 +40,12 @@ def build_helpdesk_graph():
         route_after_supervisor,
         {
             "clarification": "clarification_agent",
-            "resolution": "resolution_agent",
+            "knowledge": "knowledge_agent",
         },
     )
 
     graph.add_edge("clarification_agent", "summary_agent")
+    graph.add_edge("knowledge_agent", "resolution_agent")
     graph.add_edge("resolution_agent", "summary_agent")
     graph.add_edge("summary_agent", END)
 
@@ -58,12 +67,13 @@ def run_helpdesk_graph(
         "triage": None,
         "next_agent": None,
         "clarification_question": None,
+        "retrieved_context": None,
+        "sources": [],
         "resolution": None,
         "final_summary": None,
         "ticket_required": False,
         "sensitive_action": False,
         "requires_approval": False,
-        "sources": [],
         "agent_trace": [],
     }
 
