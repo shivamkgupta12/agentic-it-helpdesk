@@ -95,7 +95,7 @@ class ServiceNowClient:
         url = f"{self.base_url}{path}"
 
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=30.0, follow_redirects=True) as client:
                 response = client.request(
                     method=method,
                     url=url,
@@ -105,12 +105,35 @@ class ServiceNowClient:
                     params=params,
                 )
 
+            content_type = response.headers.get("content-type", "")
+            response_preview = response.text[:500] if response.text else "<empty response body>"
+
             if response.status_code >= 400:
                 raise ServiceNowAPIError(
-                    f"ServiceNow API failed: {response.status_code} {response.text}"
+                    "ServiceNow API failed: "
+                    f"status={response.status_code}, "
+                    f"content_type={content_type}, "
+                    f"body_preview={response_preview}"
                 )
 
-            return response.json()
+            if "application/json" not in content_type.lower():
+                raise ServiceNowAPIError(
+                    "ServiceNow returned a non-JSON response: "
+                    f"status={response.status_code}, "
+                    f"content_type={content_type}, "
+                    f"body_preview={response_preview}"
+                )
+
+            try:
+                return response.json()
+
+            except ValueError as exc:
+                raise ServiceNowAPIError(
+                    "ServiceNow returned invalid JSON: "
+                    f"status={response.status_code}, "
+                    f"content_type={content_type}, "
+                    f"body_preview={response_preview}"
+                ) from exc
 
         except httpx.HTTPError as exc:
             logger.exception("ServiceNow HTTP request failed")
@@ -168,7 +191,6 @@ class ServiceNowClient:
         payload: dict[str, Any] = {
             "short_description": data.short_description,
             "description": data.description,
-            "category": data.category,
             "impact": data.impact,
             "urgency": data.urgency,
         }

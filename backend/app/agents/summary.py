@@ -17,13 +17,16 @@ Include:
 - Category
 - Recommended Steps
 - Ticket Status if a ticket was created
-- Ticket Recommendation if no ticket was created
-- Approval Requirement if sensitive
+- Ticket Recommendation only if no ticket was created
+- Approval Requirement only if sensitive
 - Sources Used if sources are available
 
-Do not claim a ServiceNow ticket was created unless a ticket number is provided.
-If the ticket number starts with MOCK, clearly call it a mock/local demo ticket.
-Keep it clear and professional.
+Rules:
+- Do not include a Ticket Recommendation section if a ticket was already created.
+- Do not claim a ServiceNow ticket was created unless a ticket number is provided.
+- If the ticket number starts with MOCK, clearly call it a mock/local demo ticket.
+- If the ticket number starts with INC, call it a ServiceNow incident.
+- Keep it clear and professional.
 """
 
 

@@ -26,7 +26,7 @@ def knowledge_retrieval_agent(state: AgentState) -> dict:
     try:
         documents = similarity_search(
             query=query,
-            k=4,
+            k=3,
         )
 
         context, sources = format_documents_as_context(documents)

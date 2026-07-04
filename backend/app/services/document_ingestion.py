@@ -15,7 +15,21 @@ DEFAULT_KB_PATH = Path("../sample-knowledge-base")
 
 
 def infer_title_from_filename(path: Path) -> str:
-    return path.stem.replace("-", " ").replace("_", " ").title()
+    title = path.stem.replace("-", " ").replace("_", " ").title()
+
+    replacements = {
+        "Vpn": "VPN",
+        "It": "IT",
+        "Mfa": "MFA",
+        "Ai": "AI",
+        "Kb": "KB",
+        "Outlook Teams": "Outlook and Teams",
+    }
+
+    for old, new in replacements.items():
+        title = title.replace(old, new)
+
+    return title
 
 
 def load_markdown_documents(kb_path: Path = DEFAULT_KB_PATH) -> list[Document]:
