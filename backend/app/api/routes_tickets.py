@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.database_models import Ticket
 from app.schemas.tickets import (
+    TicketCommentRequest,
     TicketCreate,
     TicketDetailResponse,
     TicketResponse,
@@ -109,6 +110,24 @@ def update_ticket(
             priority=request.priority,
             urgency=request.urgency,
             status=request.status,
+        )
+
+    except TicketServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    
+@router.post("/{ticket_number}/comments", response_model=TicketResponse)
+def add_ticket_comment(
+    ticket_number: str,
+    request: TicketCommentRequest,
+    db: Session = Depends(get_db),
+) -> Ticket:
+    service = TicketService(db)
+
+    try:
+        return service.add_ticket_comment(
+            ticket_number=ticket_number,
+            comment=request.comment,
+            internal=request.internal,
         )
 
     except TicketServiceError as exc:

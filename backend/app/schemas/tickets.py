@@ -52,3 +52,7 @@ class TicketResponse(BaseModel):
 class TicketDetailResponse(TicketResponse):
     servicenow_sys_id: str | None = None
     conversation_id: str | None = None
+    
+class TicketCommentRequest(BaseModel):
+    comment: str = Field(..., min_length=1)
+    internal: bool = False
