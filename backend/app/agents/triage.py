@@ -36,10 +36,17 @@ Return ONLY valid JSON with this exact schema:
 }
 
 Rules:
-- Password reset, account unlock, access changes, security incident escalation, and permission changes are sensitive actions.
+- Password reset requests must be category "Password / Account".
+- Password reset requests must set sensitive_action=true.
+- Password reset requests must set ticket_required=true.
+- Password reset requests must set needs_clarification=false.
+- Account unlock requests must set sensitive_action=true.
+- Access changes and permission changes must set sensitive_action=true.
+- Security incident escalation must set sensitive_action=true.
+- For sensitive actions, do not block the workflow with clarification. Approval will handle verification.
 - VPN issues usually need a ticket if unresolved.
 - Software installation requests usually need a ticket.
-- If the message is vague, set needs_clarification to true and ask one short clarifying question.
+- If a non-sensitive message is vague, set needs_clarification=true and ask one short clarifying question.
 - Do not include markdown.
 - Do not include explanation.
 """
