@@ -65,6 +65,19 @@ def triage_agent(state: AgentState) -> dict:
 
         parsed_json = extract_json_object(raw_response)
         triage = TriageResult(**parsed_json)
+        
+        text = user_message.lower()
+
+        if "password" in text or "reset" in text or "account unlock" in text:
+            triage = TriageResult(
+                category="Password / Account",
+                priority=triage.priority,
+                urgency=triage.urgency,
+                needs_clarification=False,
+                clarifying_question=None,
+                ticket_required=True,
+                sensitive_action=True,
+            )
 
         output_summary = (
             f"Classified as {triage.category}, priority={triage.priority}, "
