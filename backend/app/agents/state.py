@@ -32,6 +32,10 @@ class AgentState(TypedDict, total=False):
     requires_approval: bool
     should_create_ticket: bool
 
+    approval_id: str | None
+    approval_status: str | None
+    approval_action_type: str | None
+
     ticket_id: str | None
     ticket_number: str | None
     ticket_status: str | None

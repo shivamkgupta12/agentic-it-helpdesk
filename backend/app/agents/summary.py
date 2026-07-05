@@ -16,14 +16,16 @@ Include:
 - Issue Summary
 - Category
 - Recommended Steps
+- Approval Status if approval is required
 - Ticket Status if a ticket was created
-- Ticket Recommendation only if no ticket was created
-- Approval Requirement only if sensitive
+- Ticket Recommendation only if no ticket was created and no approval is pending
 - Sources Used if sources are available
 
 Rules:
 - Do not include a Ticket Recommendation section if a ticket was already created.
 - Do not claim a ServiceNow ticket was created unless a ticket number is provided.
+- If approval is required, clearly say the workflow is paused pending admin approval.
+- If an approval ID exists, include it.
 - If the ticket number starts with MOCK, clearly call it a mock/local demo ticket.
 - If the ticket number starts with INC, call it a ServiceNow incident.
 - Keep it clear and professional.
@@ -34,32 +36,53 @@ def build_fallback_summary(state: AgentState) -> str:
     triage = state.get("triage")
     resolution = state.get("resolution") or state.get("clarification_question") or ""
     sources = state.get("sources", [])
+
     ticket_number = state.get("ticket_number")
     ticket_status = state.get("ticket_status")
+
+    approval_id = state.get("approval_id")
+    approval_status = state.get("approval_status")
+    approval_action_type = state.get("approval_action_type")
 
     if not triage:
         return resolution
 
     approval_note = ""
     if triage.sensitive_action:
-        approval_note = (
-            "\n\nApproval Requirement:\n"
-            "This request involves a sensitive IT action and requires admin approval "
-            "or identity verification before it can proceed."
-        )
+        if approval_id:
+            approval_note = (
+                "\n\nApproval Status:\n"
+                f"This request requires human approval before any action can proceed.\n"
+                f"Approval ID: {approval_id}\n"
+                f"Action type: {approval_action_type or 'Sensitive IT Action'}\n"
+                f"Current status: {approval_status or 'pending'}.\n"
+                "An IT admin can approve, reject, or request more information."
+            )
+        else:
+            approval_note = (
+                "\n\nApproval Status:\n"
+                "This request requires human approval or identity verification before it can proceed. "
+                "The approval request could not be created automatically."
+            )
 
     if ticket_number:
+        if str(ticket_number).startswith("INC"):
+            ticket_label = "ServiceNow incident"
+        elif str(ticket_number).startswith("MOCK"):
+            ticket_label = "local mock ticket"
+        else:
+            ticket_label = "ticket"
+
         ticket_note = (
             f"\n\nTicket Status:\n"
-            f"A local mock ticket has been created: {ticket_number}.\n"
+            f"A {ticket_label} has been created: {ticket_number}.\n"
             f"Current status: {ticket_status or 'Open'}."
         )
     else:
         if triage.sensitive_action:
             ticket_note = (
-                "\n\nTicket Recommendation:\n"
-                "A ticket or approval request can be created after the required admin "
-                "approval or identity verification step."
+                "\n\nTicket Status:\n"
+                "No ticket has been created yet. A ticket can be created after admin approval."
             )
         elif triage.ticket_required:
             ticket_note = (
@@ -85,8 +108,8 @@ def build_fallback_summary(state: AgentState) -> str:
         f"Issue Summary:\n{state['user_message']}\n\n"
         f"Category:\n{triage.category}\n\n"
         f"Recommended Steps:\n{resolution}"
-        f"{ticket_note}"
         f"{approval_note}"
+        f"{ticket_note}"
         f"{sources_note}"
     )
 
@@ -98,15 +121,23 @@ def summary_agent(state: AgentState) -> dict:
     sources = state.get("sources", [])
     ticket_number = state.get("ticket_number")
     ticket_status = state.get("ticket_status")
+    
+    approval_id = state.get("approval_id")
+    approval_status = state.get("approval_status")
+    approval_action_type = state.get("approval_action_type")
 
     prompt = (
         f"User issue: {state['user_message']}\n\n"
         f"Triage result: {triage.model_dump() if triage else {}}\n\n"
         f"Resolution or clarification:\n{resolution}\n\n"
+        f"Approval ID: {approval_id}\n"
+        f"Approval status: {approval_status}\n"
+        f"Approval action type: {approval_action_type}\n\n"
         f"Ticket number: {ticket_number}\n"
         f"Ticket status: {ticket_status}\n\n"
         f"Sources:\n{sources}\n\n"
         "Create the final response. "
+        "If approval is pending, explain that the workflow is paused. "
         "If a ticket number exists, include it clearly. "
         "If sources are available, include a short 'Sources Used' section."
     )

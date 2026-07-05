@@ -2,6 +2,7 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
+from app.agents.approval import human_approval_agent
 from app.agents.clarification import clarification_agent
 from app.agents.knowledge import knowledge_retrieval_agent
 from app.agents.resolution import resolution_agent
@@ -14,8 +15,17 @@ from app.agents.triage import triage_agent
 
 def route_after_resolution(state: AgentState) -> str:
     """
-    Decide whether to run Ticket Agent before Summary Agent.
+    Decide what happens after the Resolution Agent.
+
+    Sensitive actions must go to Human Approval Agent.
+    Non-sensitive unresolved/request-based issues can go to Ticket Agent.
+    Otherwise, go to Summary Agent.
     """
+
+    triage = state.get("triage")
+
+    if triage and triage.sensitive_action:
+        return "approval"
 
     if should_create_ticket_now(state):
         return "ticket"
@@ -25,7 +35,7 @@ def route_after_resolution(state: AgentState) -> str:
 
 def build_helpdesk_graph():
     """
-    Builds the Phase 5 LangGraph workflow.
+    Builds the Phase 7 LangGraph workflow.
 
     Flow:
     START
@@ -33,7 +43,8 @@ def build_helpdesk_graph():
       → Supervisor Agent
       → Clarification Agent OR Knowledge Retrieval Agent
       → Resolution Agent
-      → Ticket Agent if ticket should be created
+      → Human Approval Agent if sensitive
+      → Ticket Agent if normal ticket should be created
       → Summary Agent
       → END
     """
@@ -45,6 +56,7 @@ def build_helpdesk_graph():
     graph.add_node("clarification_agent", clarification_agent)
     graph.add_node("knowledge_agent", knowledge_retrieval_agent)
     graph.add_node("resolution_agent", resolution_agent)
+    graph.add_node("approval_agent", human_approval_agent)
     graph.add_node("ticket_agent", ticket_agent)
     graph.add_node("summary_agent", summary_agent)
 
@@ -67,11 +79,13 @@ def build_helpdesk_graph():
         "resolution_agent",
         route_after_resolution,
         {
+            "approval": "approval_agent",
             "ticket": "ticket_agent",
             "summary": "summary_agent",
         },
     )
 
+    graph.add_edge("approval_agent", "summary_agent")
     graph.add_edge("ticket_agent", "summary_agent")
     graph.add_edge("summary_agent", END)
 
@@ -105,6 +119,9 @@ def run_helpdesk_graph(
         "sensitive_action": False,
         "requires_approval": False,
         "should_create_ticket": False,
+        "approval_id": None,
+        "approval_status": None,
+        "approval_action_type": None,
         "ticket_id": None,
         "ticket_number": None,
         "ticket_status": None,
