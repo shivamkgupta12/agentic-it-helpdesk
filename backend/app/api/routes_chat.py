@@ -270,6 +270,6 @@ def chat(
         response=final_response,
         ticket_number=graph_result.get("ticket_number"),
         requires_approval=graph_result.get("requires_approval", False),
-        approval_id=None,
+        approval_id=graph_result.get("approval_id"),
         sources=graph_result.get("sources", []),
     )
