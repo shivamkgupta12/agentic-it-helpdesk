@@ -6,14 +6,23 @@ def supervisor_agent(state: AgentState) -> dict:
     """
     Decides which agent should act next.
 
-    Phase 4 routing:
-    - If clarification is needed: go to Clarification Agent.
-    - Otherwise: go to Knowledge Retrieval Agent.
+    Routing priority:
+    1. Sensitive actions should NOT stop at clarification.
+       They should go through knowledge + resolution + approval.
+    2. Vague non-sensitive issues can go to clarification.
+    3. All other issues go to knowledge retrieval.
     """
 
     triage = state.get("triage")
 
-    if triage and triage.needs_clarification:
+    if triage and triage.sensitive_action:
+        next_agent = "knowledge"
+        decision = (
+            "Selected Knowledge Retrieval Agent because the request is sensitive "
+            "and must proceed toward human approval."
+        )
+
+    elif triage and triage.needs_clarification:
         next_agent = "clarification"
         decision = "Selected Clarification Agent because the issue is vague."
 
@@ -28,6 +37,8 @@ def supervisor_agent(state: AgentState) -> dict:
         output_summary=decision,
         metadata={
             "next_agent": next_agent,
+            "sensitive_action": triage.sensitive_action if triage else False,
+            "needs_clarification": triage.needs_clarification if triage else False,
         },
     )
 
