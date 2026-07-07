@@ -4,12 +4,6 @@ export type SourceCitation = {
   chunk_id?: string | null;
 };
 
-export type ChatRequest = {
-  message: string;
-  conversation_id?: string | null;
-  user_email?: string;
-};
-
 export type ChatResponse = {
   conversation_id: string;
   response: string;
@@ -35,15 +29,6 @@ export type Ticket = {
   conversation_id?: string | null;
 };
 
-export type TicketStatus = {
-  ticket_number: string;
-  status: string;
-  category: string;
-  priority: string;
-  urgency: string;
-  latest_update?: string | null;
-};
-
 export type Approval = {
   id: string;
   ticket_id?: string | null;
@@ -55,14 +40,6 @@ export type Approval = {
   admin_comment?: string | null;
   created_at: string;
   updated_at: string;
-};
-
-export type ApprovalDecisionResponse = {
-  approval_id: string;
-  status: string;
-  message: string;
-  ticket_id?: string | null;
-  ticket_number?: string | null;
 };
 
 export type KnowledgeDocument = {

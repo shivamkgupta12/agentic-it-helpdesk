@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AppShell } from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "Agentic IT Helpdesk",
-  description: "Multi-agent IT support automation portfolio project",
+  description: "Multi-Agent IT Support Automation System",
 };
 
 export default function RootLayout({
@@ -14,9 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <AppShell>{children}</AppShell>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
