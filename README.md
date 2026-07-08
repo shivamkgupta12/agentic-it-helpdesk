@@ -194,6 +194,22 @@ Multi-Agent Workflow + RAG + ServiceNow + Database
 
 The backend coordinates all agent steps and external integrations. The frontend provides employee and admin interfaces.
 
+### Architecture Diagram
+
+![Architecture Diagram](docs/images/architecture-diagram.png)
+
+### Agent Workflow Diagram
+
+![Agent Workflow Diagram](docs/images/agent-workflow-diagram.png)
+
+### Human Approval Workflow Diagram
+
+![Human Approval Workflow Diagramm](docs/images/human-approval-workflow-diagram.png)
+
+### Data Model Diagram
+
+![Human Approval Workflow Diagramm](docs/images/data-model-diagram.png)
+
 ---
 
 ## Project Structure
@@ -625,22 +641,6 @@ Expected:
 ### ServiceNow Incident
 
 ![ServiceNow Incident](docs/images/servicenow-incident.png)
-
----
-
-## What This Project Demonstrates
-
-This project demonstrates practical experience with:
-
-* Designing multi-agent AI workflows
-* Building production-style FastAPI services
-* Integrating Azure OpenAI into backend systems
-* Implementing RAG over internal documents
-* Creating real ServiceNow incidents through API integration
-* Designing human approval workflows for sensitive IT actions
-* Building full-stack applications with Next.js and TypeScript
-* Persisting workflow state, tickets, approvals, and trace logs
-* Writing modular, testable, portfolio-ready code
 
 ---
 
